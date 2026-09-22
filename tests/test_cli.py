@@ -235,3 +235,87 @@ def test_a_missing_configured_handoff_gives_a_clear_error_not_a_traceback(cfg_ro
     assert "/definitely/not/a/real/HANDOFF.md" in err
     assert "set-handoff" in err
     assert "Traceback" not in err
+
+
+# --- set-data: adopting a dashboard-data directory that already exists --------
+
+
+def test_set_data_adopts_an_existing_directory(cfg_root, tmp_path):
+    """The second person's path: the data already exists, nothing should move."""
+    handoff = tmp_path / "HANDOFF.md"
+    handoff.write_text(HANDOFF)
+    shared = tmp_path / "overleaf" / "dashboard-data"
+    assert main(["sync", "--handoff", str(handoff), "--data", str(shared)]) == 0
+
+    assert main(["set-data", str(shared)]) == 0
+    cfg = json.loads((cfg_root / "dashboard-config.json").read_text())
+    assert Path(cfg["data_dir"]).resolve() == shared.resolve()
+
+
+def test_the_dashboard_then_reads_the_adopted_data(cfg_root, tmp_path):
+    handoff = tmp_path / "HANDOFF.md"
+    handoff.write_text(HANDOFF)
+    shared = tmp_path / "overleaf" / "dashboard-data"
+    main(["sync", "--handoff", str(handoff), "--data", str(shared)])
+    (shared / "dashboard.json").unlink()
+
+    assert main(["set-data", str(shared)]) == 0
+    # No --data: the config must be what resolves, and export must land there.
+    assert main(["export"]) == 0
+    doc = json.loads((shared / "dashboard.json").read_text())
+    assert {q["id"] for q in doc["questions"]} == {"1", "25"}
+
+
+def test_set_data_moves_and_creates_nothing_at_the_old_location(cfg_root, tmp_path):
+    handoff = tmp_path / "HANDOFF.md"
+    handoff.write_text(HANDOFF)
+    shared = tmp_path / "overleaf" / "dashboard-data"
+    main(["sync", "--handoff", str(handoff), "--data", str(shared)])
+    before = sorted(p.name for p in shared.iterdir())
+
+    old_default = cfg_root / "dashboard-data"
+    assert not old_default.exists()
+
+    assert main(["set-data", str(shared)]) == 0
+    assert not old_default.exists()
+    assert sorted(p.name for p in shared.iterdir()) == before
+
+
+def test_set_data_rejects_a_missing_path(cfg_root, tmp_path, capsys):
+    missing = tmp_path / "not-here" / "dashboard-data"
+    assert main(["set-data", str(missing)]) != 0
+    assert str(missing) in capsys.readouterr().err
+    assert not (cfg_root / "dashboard-config.json").exists()
+
+
+def test_set_data_needs_an_argument(cfg_root, capsys):
+    assert main(["set-data"]) != 0
+    assert "set-data" in capsys.readouterr().err
+
+
+def test_set_data_to_the_current_location_is_a_noop(cfg_root, tmp_path, capsys):
+    handoff = tmp_path / "HANDOFF.md"
+    handoff.write_text(HANDOFF)
+    shared = tmp_path / "overleaf" / "dashboard-data"
+    main(["sync", "--handoff", str(handoff), "--data", str(shared)])
+    assert main(["set-data", str(shared)]) == 0
+    capsys.readouterr()
+
+    assert main(["set-data", str(shared)]) == 0
+    assert "nothing to do" in capsys.readouterr().out
+    cfg = json.loads((cfg_root / "dashboard-config.json").read_text())
+    assert Path(cfg["data_dir"]).resolve() == shared.resolve()
+
+
+def test_set_data_warns_when_the_directory_holds_no_dashboard_json(cfg_root, tmp_path,
+                                                                   capsys):
+    """Pointing at an empty or wrong folder should say so, not silently start
+    an empty board. It is a warning, not an error: the path is still recorded."""
+    empty = tmp_path / "empty" / "dashboard-data"
+    empty.mkdir(parents=True)
+    assert main(["set-data", str(empty)]) == 0
+    captured = capsys.readouterr()
+    assert "warning" in captured.err.lower()
+    assert "dashboard.json" in captured.err
+    cfg = json.loads((cfg_root / "dashboard-config.json").read_text())
+    assert Path(cfg["data_dir"]).resolve() == empty.resolve()

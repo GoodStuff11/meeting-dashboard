@@ -1,9 +1,9 @@
 """Command line entry point.
 
 Two verbs matter day to day: `serve` for a person and `update` for an agent.
-`where`, `move-data` and `set-handoff` are the plumbing for relocating the
-data directory or pointing at a different HANDOFF.md; everything else is
-plumbing too.
+`where`, `move-data`, `set-data` and `set-handoff` are the plumbing for
+relocating the data directory, adopting one that already exists, or pointing
+at a different HANDOFF.md; everything else is plumbing too.
 """
 
 import argparse
@@ -170,6 +170,47 @@ def _cmd_move_data(args):
     return 0
 
 
+def _cmd_set_data(args):
+    """Point the config at a `dashboard-data` directory that already exists.
+
+    The mirror of `set-handoff`, and the opposite of `move-data`: nothing is
+    moved, copied or created. This is the command for the second and third
+    person on a shared data directory — they clone the repo that already
+    carries it and only need to say where it is.
+
+    Note the asymmetry with `move-data`, which takes the *parent* the folder
+    should live in. This takes the `dashboard-data` folder itself.
+    """
+    if not args.target:
+        print("error: ./dashboard set-data needs the path to an existing "
+              "dashboard-data directory (the folder itself, not its parent)",
+              file=sys.stderr)
+        return 1
+    path = Path(args.target).resolve()
+    if not path.is_dir():
+        print(f"error: no directory at {path}", file=sys.stderr)
+        return 1
+
+    cfg = config.load()
+    if config.resolve_data_dir(cfg).resolve() == path:
+        print(f"dashboard-data is already set to {path} — nothing to do")
+        return 0
+
+    try:
+        cfg["data_dir"] = str(path.relative_to(config.PROJECT_ROOT))
+    except ValueError:
+        cfg["data_dir"] = str(path)
+    config.save(cfg)
+
+    print(f"data dir set to {path}")
+    if not (path / "dashboard.json").exists():
+        print(f"warning: no dashboard.json in {path} — the board will start "
+              f"empty. If you meant to adopt the group's data, check the path; "
+              f"otherwise run `./dashboard sync` to build it from HANDOFF.md §7.",
+              file=sys.stderr)
+    return 0
+
+
 def _cmd_set_handoff(args):
     if not args.target:
         print("error: ./dashboard set-handoff needs a path to HANDOFF.md",
@@ -191,11 +232,14 @@ def main(argv=None):
                                      description="The Kim group meeting dashboard.")
     parser.add_argument("command",
                         choices=["sync", "serve", "update", "export", "meeting",
-                                 "where", "move-data", "set-handoff"])
+                                 "where", "move-data", "set-data", "set-handoff"])
     parser.add_argument("target", nargs="?",
                         help="for `meeting`: the meeting's date, YYYY-MM-DD. "
                              "for `move-data`: the directory dashboard-data should "
                              "live in (the parent, not the folder itself). "
+                             "for `set-data`: an existing dashboard-data directory "
+                             "to adopt — the folder itself, not its parent, which is "
+                             "deliberately the opposite of `move-data`. "
                              "for `set-handoff`: the new HANDOFF.md path.")
     parser.add_argument("--handoff", help="path to HANDOFF.md, overriding the config")
     parser.add_argument("--data", help="data directory, overriding the config")
@@ -212,6 +256,8 @@ def main(argv=None):
         return _cmd_where(args)
     if args.command == "move-data":
         return _cmd_move_data(args)
+    if args.command == "set-data":
+        return _cmd_set_data(args)
     if args.command == "set-handoff":
         return _cmd_set_handoff(args)
 
