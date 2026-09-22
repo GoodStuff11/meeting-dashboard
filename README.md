@@ -23,7 +23,9 @@ whether anyone in the group has set this up before you.
 
 ### If you are the first person setting this up
 
-Tell it where `HANDOFF.md` is, then sync.
+Tell it where `HANDOFF.md` is, then sync. There is no default path — a default
+would be whoever set this up first, and it would be wrong on your machine — so
+`set-handoff` is a required first step, not an optional one.
 
 ```bash
 cd meeting-dashboard
@@ -75,7 +77,9 @@ cd meeting-dashboard
 
 `set-data` records the path and moves nothing. The database rebuilds itself
 from the committed `dashboard.json` the first time you run anything, so the
-board comes up populated.
+board comes up populated. `set-handoff` is still needed: the config is
+per-machine and gitignored, so nothing about the group's setup carries over in
+the clone.
 
 **Do not run `move-data` here.** `move-data` relocates your data directory to
 somewhere new, and it refuses any destination that already has a non-empty
@@ -158,7 +162,10 @@ with an error.
 **`where`** — `./dashboard where [--handoff P] [--data D]`. Prints the two
 paths this checkout resolves to. Run it first whenever something looks wrong;
 most confusion is a checkout pointing at a data directory you did not expect.
-It writes `dashboard-config.json` with the defaults if there is not one yet.
+Before you have run `set-handoff` it prints
+`handoff: not set (run ./dashboard set-handoff <path>)` rather than a path that
+is not there. It writes `dashboard-config.json` with the defaults if there is
+not one yet.
 
 **`set-handoff`** — `./dashboard set-handoff /path/to/HANDOFF.md`. Validates
 that the file exists, then records its absolute path in the config. Errors
@@ -201,10 +208,17 @@ never gets committed.
 change it**. Nothing is written to `dashboard-config.json` by using them. To
 make a change stick, use `set-handoff` or `set-data`.
 
-`--clickup` reads `dashboard-data/clickup-cache.json` and nothing else. This
-process never touches the network. If there is no cache file it is a silent
-no-op; the snapshot has to be refreshed by an agent that has a ClickUp
-connector (see below).
+`--clickup` reads `clickup-cache.json` in the data directory and nothing else.
+This process never touches the network. If there is no cache file, the sync
+still runs normally and says so:
+
+```
+note: no clickup-cache.json in /home/you/paper/dashboard-data — syncing without ClickUp status.
+      An agent with the ClickUp connector can write that snapshot.
+```
+
+The snapshot has to be refreshed by an agent that has a ClickUp connector (see
+below).
 
 ## The workflow around a meeting
 
@@ -340,6 +354,16 @@ meeting-dashboard/
 }
 ```
 
+A fresh clone's looks like this instead, and `sync` will refuse to run until
+`handoff` is filled in:
+
+```json
+{
+  "data_dir": "dashboard-data",
+  "handoff": null
+}
+```
+
 `data_dir` is relative to the project root, or absolute. The file is gitignored
 on purpose: those paths are specific to your machine and your checkout, not
 something to share. Every clone gets its own. A fresh clone has none; the first
@@ -364,22 +388,34 @@ is where those files get committed — and `move-data` adds
 
 ## Troubleshooting
 
-**The port is already in use.** `./dashboard serve` ends in
-`OSError: [Errno 98] Address already in use`. Either something else has 8765,
-or you left a server running in another terminal. Pick another port:
+**The port is already in use.** `./dashboard serve` prints
 
-```bash
-./dashboard serve --port 8790
+```
+error: port 8765 is already in use — try ./dashboard serve --port 8766
 ```
 
-Use `--host` as well if you need it reachable from somewhere other than
-localhost.
+Either something else has the port, or you left a server running in another
+terminal. Pick another one. Use `--host` as well if you need it reachable from
+somewhere other than localhost.
 
-**`HANDOFF.md` not found.** `sync` and `update` fail with the path they looked
-at and tell you to run `./dashboard set-handoff <path>`. That is the fix, not a
-bug report. Run `./dashboard where` to see what the checkout currently thinks.
-If the file is there but §7 cannot be parsed, the error says so and names the
-file.
+**No `HANDOFF.md` configured.** On a checkout that has never run `set-handoff`,
+`sync` and `update` stop before doing anything:
+
+```
+error: no HANDOFF.md configured yet.
+  Point the dashboard at your clone of the paper repo:
+      ./dashboard set-handoff /path/to/HANDOFF.md
+```
+
+There is no default and nothing is guessed. Searching your disk for something
+that looks like a `HANDOFF.md` would risk syncing against the wrong ledger,
+which is much worse than being asked once.
+
+**`HANDOFF.md` not found at the configured path.** `sync` and `update` fail
+with the path they looked at and tell you to run
+`./dashboard set-handoff <path>`. That is the fix, not a bug report. Run
+`./dashboard where` to see what the checkout currently thinks. If the file is
+there but §7 cannot be parsed, the error says so and names the file.
 
 **The browser cannot reach the server.** VS Code's port forwarding does
 sometimes wedge, and a forwarded port with a dead tunnel behind it looks

@@ -319,3 +319,91 @@ def test_set_data_warns_when_the_directory_holds_no_dashboard_json(cfg_root, tmp
     assert "dashboard.json" in captured.err
     cfg = json.loads((cfg_root / "dashboard-config.json").read_text())
     assert Path(cfg["data_dir"]).resolve() == empty.resolve()
+
+
+# --- no default HANDOFF.md, a real port error, a visible --clickup no-op ------
+
+
+def test_sync_without_a_configured_handoff_says_so_and_names_the_fix(cfg_root, capsys):
+    """A fresh clone has no handoff configured — there is no default, because a
+    default would be one person's machine baked into a shared repository."""
+    code = main(["sync"])
+    assert code != 0
+    err = capsys.readouterr().err
+    assert "no HANDOFF.md configured" in err
+    assert "set-handoff" in err
+    assert "Traceback" not in err
+
+
+def test_update_without_a_configured_handoff_fails_before_serving(cfg_root, capsys):
+    assert main(["update"]) != 0
+    assert "set-handoff" in capsys.readouterr().err
+
+
+def test_where_prints_the_unset_handoff_honestly(cfg_root, capsys):
+    assert main(["where"]) == 0
+    out = capsys.readouterr().out
+    assert "handoff: not set" in out
+    assert "set-handoff" in out
+
+
+def test_where_prints_the_handoff_once_it_is_set(cfg_root, tmp_path, capsys):
+    real = tmp_path / "HANDOFF.md"
+    real.write_text(HANDOFF)
+    main(["set-handoff", str(real)])
+    capsys.readouterr()
+    assert main(["where"]) == 0
+    out = capsys.readouterr().out
+    assert str(real.resolve()) in out
+    assert "not set" not in out
+
+
+def test_the_default_config_carries_no_handoff_path(cfg_root):
+    assert main(["where"]) == 0
+    cfg = json.loads((cfg_root / "dashboard-config.json").read_text())
+    assert cfg["handoff"] is None
+
+
+def test_a_port_already_in_use_is_a_message_not_a_traceback(workspace, capsys):
+    import socket
+
+    handoff, data = workspace
+    main(["sync", "--handoff", str(handoff), "--data", str(data)])
+    capsys.readouterr()
+
+    holder = socket.socket()
+    holder.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    holder.bind(("127.0.0.1", 0))
+    holder.listen(1)
+    port = holder.getsockname()[1]
+    try:
+        code = main(["serve", "--data", str(data), "--port", str(port)])
+    finally:
+        holder.close()
+    assert code != 0
+    err = capsys.readouterr().err
+    assert f"port {port} is already in use" in err
+    assert "--port" in err
+    assert "Traceback" not in err
+
+
+def test_clickup_without_a_cache_file_says_so_and_still_syncs(workspace, capsys):
+    handoff, data = workspace
+    assert main(["sync", "--handoff", str(handoff), "--data", str(data),
+                 "--clickup"]) == 0
+    out = capsys.readouterr().out
+    assert "no clickup-cache.json" in out
+    assert "ClickUp connector" in out
+    # Still a real sync: the board was built.
+    doc = json.loads((data / "dashboard.json").read_text())
+    assert {q["id"] for q in doc["questions"]} == {"1", "25"}
+
+
+def test_no_clickup_notice_once_the_cache_exists(workspace, capsys):
+    handoff, data = workspace
+    main(["sync", "--handoff", str(handoff), "--data", str(data)])
+    (data / "clickup-cache.json").write_text('{"pulled_on": "2026-09-21", "tasks": {}}\n')
+    capsys.readouterr()
+    assert main(["sync", "--handoff", str(handoff), "--data", str(data),
+                 "--clickup"]) == 0
+    assert "no clickup-cache.json" not in capsys.readouterr().out

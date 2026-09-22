@@ -47,3 +47,15 @@ def test_load_does_not_overwrite_an_existing_config(sandbox):
 def test_resolve_handoff_reads_the_config_value(sandbox):
     cfg = {"data_dir": "dashboard-data", "handoff": "/custom/HANDOFF.md"}
     assert config.resolve_handoff(cfg) == Path("/custom/HANDOFF.md")
+
+
+def test_the_defaults_carry_no_handoff_path(sandbox):
+    """A default here would be one person's machine, written into every other
+    clone's config on its first run."""
+    assert config.defaults()["handoff"] is None
+
+
+def test_resolve_handoff_is_none_when_nothing_is_configured(sandbox):
+    assert config.resolve_handoff({"data_dir": "dashboard-data"}) is None
+    assert config.resolve_handoff({"data_dir": "dashboard-data", "handoff": None}) is None
+    assert config.resolve_handoff({}) is None

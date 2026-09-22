@@ -4,7 +4,8 @@
 its paths are specific to this machine and this checkout, not something to
 share. A fresh clone has no config file yet; `load()` falls back to the
 defaults below and writes the file out so the choice this machine is making
-is durable and visible rather than silently re-guessed on every run.
+is durable and visible rather than silently re-guessed on every run. The
+`handoff` default is None: see the note beside it.
 """
 
 import json
@@ -15,11 +16,19 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "dashboard-config.json"
 
 DEFAULT_DATA_DIR = "dashboard-data"
-DEFAULT_HANDOFF = "/home/jek354/research/68f6bef0eaaf5c0928a922c6/HANDOFF.md"
+
+# There is deliberately no default HANDOFF.md. Any path written here would be
+# one person's machine baked into a repository the whole group clones, and
+# every other checkout would start out pointing at a directory that does not
+# exist. Unset is a first-class state: `resolve_handoff` returns None, and the
+# commands that need section 7 say so and name the fix. Guessing — searching
+# the filesystem for something that looks like a HANDOFF.md — would be worse
+# than asking, because guessing wrong means silently syncing against the wrong
+# ledger.
 
 
 def defaults():
-    return {"data_dir": DEFAULT_DATA_DIR, "handoff": DEFAULT_HANDOFF}
+    return {"data_dir": DEFAULT_DATA_DIR, "handoff": None}
 
 
 def load(config_path=None):
@@ -49,4 +58,6 @@ def resolve_data_dir(cfg, root=None):
 
 
 def resolve_handoff(cfg):
-    return Path(cfg.get("handoff") or DEFAULT_HANDOFF)
+    """The configured HANDOFF.md, or None when none has been set yet."""
+    handoff = (cfg or {}).get("handoff")
+    return Path(handoff) if handoff else None

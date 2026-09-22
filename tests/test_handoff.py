@@ -218,16 +218,32 @@ Prose with no item headers at all.
         parse_handoff(bad)
 
 
-from pathlib import Path
+import json
+from pathlib import Path  # noqa: F401
 
 from project_tracker import config
 
-REAL = Path(config.DEFAULT_HANDOFF)
+def _configured_handoff():
+    """The HANDOFF.md this checkout is configured to use, or None.
+
+    Read straight off disk rather than through `config.load()`, which would
+    write a config file as a side effect of merely collecting tests. There is
+    no default handoff path any more — a personal path baked into a shared
+    repository was the bug — so a checkout that has never run `set-handoff`
+    skips these.
+    """
+    if not config.CONFIG_PATH.exists():
+        return None
+    path = config.resolve_handoff(json.loads(config.CONFIG_PATH.read_text()))
+    return path if path is not None and path.exists() else None
+
+
+REAL = _configured_handoff()
 EXPECTED_ITEMS = 30
 EXPECTED_FLAGS = 7
 
 
-@pytest.mark.skipif(not REAL.exists(), reason="HANDOFF.md not present")
+@pytest.mark.skipif(REAL is None, reason="no HANDOFF.md configured")
 def test_parses_the_real_handoff_without_losing_items():
     items, flags = parse_handoff(REAL.read_text())
     assert len(items) == EXPECTED_ITEMS
@@ -237,7 +253,7 @@ def test_parses_the_real_handoff_without_losing_items():
     assert any(i.clickup_id for i in items)
 
 
-@pytest.mark.skipif(not REAL.exists(), reason="HANDOFF.md not present")
+@pytest.mark.skipif(REAL is None, reason="no HANDOFF.md configured")
 def test_real_item_14_is_read_as_high_priority():
     """Its body says "*Task `86akhca0p`, high priority.*" and it decides the venue."""
     items, _ = parse_handoff(REAL.read_text())

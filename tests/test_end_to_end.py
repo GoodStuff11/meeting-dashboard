@@ -14,8 +14,23 @@ from project_tracker.store import connect, get_question, list_decisions
 from project_tracker.sync import sync
 from project_tracker import config
 
-REAL = Path(config.DEFAULT_HANDOFF)
-pytestmark = pytest.mark.skipif(not REAL.exists(), reason="HANDOFF.md not present")
+def _configured_handoff():
+    """The HANDOFF.md this checkout is configured to use, or None.
+
+    Read straight off disk rather than through `config.load()`, which would
+    write a config file as a side effect of merely collecting tests. There is
+    no default handoff path any more — a personal path baked into a shared
+    repository was the bug — so a checkout that has never run `set-handoff`
+    skips these.
+    """
+    if not config.CONFIG_PATH.exists():
+        return None
+    path = config.resolve_handoff(json.loads(config.CONFIG_PATH.read_text()))
+    return path if path is not None and path.exists() else None
+
+
+REAL = _configured_handoff()
+pytestmark = pytest.mark.skipif(REAL is None, reason="no HANDOFF.md configured")
 
 
 def _post(base, path, payload):

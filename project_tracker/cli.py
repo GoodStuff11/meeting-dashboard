@@ -37,11 +37,24 @@ def _handoff_path(args, cfg):
 
 def _do_sync(conn, args, paths, cfg):
     handoff = _handoff_path(args, cfg)
+    if handoff is None:
+        print("error: no HANDOFF.md configured yet.\n"
+              "  Point the dashboard at your clone of the paper repo:\n"
+              "      ./dashboard set-handoff /path/to/HANDOFF.md",
+              file=sys.stderr)
+        return None
     if not handoff.exists():
         print(f"error: no HANDOFF.md at {handoff} — "
               f"run `./dashboard set-handoff <path>` to point at the right file",
               file=sys.stderr)
         return None
+    if args.clickup and not paths["clickup"].exists():
+        # A flag that silently does nothing is how somebody concludes the
+        # feature is broken. The sync itself is still valid, so this is a
+        # notice and not an error.
+        print(f"note: no clickup-cache.json in {paths['clickup'].parent} — "
+              f"syncing without ClickUp status.\n"
+              f"      An agent with the ClickUp connector can write that snapshot.")
     try:
         result = run_sync(
             conn, handoff_path=handoff,
@@ -99,7 +112,10 @@ def _cmd_where(args):
     data_dir = Path(args.data) if args.data else config.resolve_data_dir(cfg)
     handoff = _handoff_path(args, cfg)
     print(f"data dir: {data_dir.resolve() if data_dir.exists() else data_dir}")
-    print(f"handoff: {handoff}")
+    if handoff is None:
+        print("handoff: not set (run ./dashboard set-handoff <path>)")
+    else:
+        print(f"handoff: {handoff}")
     return 0
 
 
@@ -297,7 +313,17 @@ def main(argv=None):
         print(f"wrote {paths['json']}")
         return 0
 
-    serve_module.run(conn, paths["json"], host=args.host, port=args.port)
+    try:
+        serve_module.run(conn, paths["json"], host=args.host, port=args.port)
+    except OSError as exc:
+        # Only the one failure a person causes routinely. Every other OSError
+        # propagates: a swallowed bind failure of some other kind would be
+        # worse than a traceback.
+        if exc.errno != errno.EADDRINUSE:
+            raise
+        print(f"error: port {args.port} is already in use — try "
+              f"./dashboard serve --port {args.port + 1}", file=sys.stderr)
+        return 1
     return 0
 
 
