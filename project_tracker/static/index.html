@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meeting dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="error" class="error" hidden></div>
+  <header>
+    <h1>State of project</h1>
+    <div class="sub" id="subtitle"></div>
+  </header>
+  <nav>
+    <button id="tab-questions" aria-selected="true" data-panel="questions">Open questions</button>
+    <button id="tab-agenda" aria-selected="false" data-panel="agenda">Meeting agenda</button>
+    <button id="tab-decisions" aria-selected="false" data-panel="decisions">Decisions</button>
+  </nav>
+  <main>
+    <section id="questions"></section>
+    <section id="agenda" hidden></section>
+    <section id="decisions" hidden></section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

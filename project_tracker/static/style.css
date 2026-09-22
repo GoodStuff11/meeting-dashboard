@@ -1,0 +1,82 @@
+:root {
+  --bg: #EEF1F4; --surface: #FFFFFF; --ink: #14202A; --muted: #5C6B78;
+  --faint: #8A98A4; --rule: #D3DBE2; --accent: #1F5673; --accent-soft: #E4EDF2;
+  --heat-0: #6E8494; --heat-1: #B98A2A; --heat-2: #B0562A; --heat-3: #97231C;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+/* header, nav and main share one centred column: on a wide monitor the board
+   used to hug the left edge with a large empty gutter on the right. The
+   nav's bottom rule is confined to that same column rather than run
+   full-bleed across the window — full-bleed would be the one edge that no
+   longer lines up with the title above it or the cards below it, which reads
+   as more broken than a rule that stops where the column stops. */
+header { padding: 20px 24px 8px; max-width: 980px; margin: 0 auto; }
+header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+header .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+nav {
+  display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--rule);
+  max-width: 980px; margin: 0 auto;
+}
+nav button {
+  background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
+  padding: 10px 14px; font: inherit; color: var(--muted);
+}
+nav button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+main { padding: 20px 24px 60px; max-width: 980px; margin: 0 auto; }
+section[hidden] { display: none; }
+h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 10px; }
+.card {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 12px 14px; margin-bottom: 8px;
+}
+.card.closed { opacity: .72; }
+.card .row { display: flex; gap: 10px; align-items: baseline; }
+.card .num { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); }
+.card .title { font-weight: 600; flex: 1; }
+.card .why { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--faint); }
+.tag { background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 1px 6px; }
+.heat { color: #fff; border-radius: 3px; padding: 1px 6px; }
+button.act {
+  font: inherit; font-size: 13px; cursor: pointer; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 4px; padding: 4px 10px; color: var(--ink);
+}
+button.act:hover { border-color: var(--accent); color: var(--accent); }
+textarea, input[type=text] {
+  width: 100%; font: inherit; font-size: 13px; padding: 6px 8px; margin-top: 8px;
+  border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); color: var(--ink);
+}
+.grounds { font-size: 13px; color: var(--muted); margin-top: 4px; }
+/* A §7.1 disagreement. Resolved ones stay on screen, dimmed: the convention is
+   that they are listed, never quietly disposed of. */
+.card.flag { border-left: 3px solid var(--heat-1); }
+.card.flag .title { font-weight: 500; }
+.card.flag.resolved { opacity: .55; border-left-color: var(--rule); }
+.card.flag.resolved .title { text-decoration: line-through; }
+/* A dismissed sync proposal: collapsed and muted, but recoverable. */
+.dismissed-group { margin-top: 18px; }
+.dismissed-group > summary {
+  cursor: pointer; font-size: 13px; color: var(--faint); padding: 4px 0;
+}
+.card.dismissed { opacity: .6; }
+.daygroup { margin-top: 18px; }
+.daygroup > .date { font-weight: 600; font-size: 13px; color: var(--accent); margin-bottom: 6px; }
+.empty { color: var(--faint); font-size: 13px; padding: 8px 0; }
+.error { background: #97231C; color: #fff; padding: 8px 24px; font-size: 13px; }
+select { font: inherit; font-size: 12px; }
+/* §7 rich text: `code` stays at prose weight, not a loud chip. */
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .92em; color: var(--ink);
+}
+.why code, .grounds code { color: var(--muted); }
+/* The raised date is pushed to the far end of its meta row. */
+.meta .raised { margin-left: auto; }
+.difficulty {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--faint);
+}

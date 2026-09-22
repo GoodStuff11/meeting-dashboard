@@ -1,0 +1,5 @@
+dashboard-config.json
+dashboard-data/dashboard.db
+__pycache__/
+*.pyc
+.pytest_cache/
