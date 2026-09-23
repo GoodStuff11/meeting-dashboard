@@ -225,3 +225,39 @@ test("two adjacent padded operators get exactly one space between them, not two"
   const h = await start(board());
   assert.equal(rich(h, "$\\dim\\log$").textContent, `dim${THIN}log`);
 });
+
+test("text without a newline gets no block wrapper", async () => {
+  const h = await start(board());
+  const frag = rich(h, "one **line** only");
+  assert.equal(find(frag, (n) => n.tagName === "p").length, 0);
+  assert.equal(frag.textContent, "one line only");
+});
+
+test("blank-line-separated paragraphs and - bullets render as <p> and <ul><li>", async () => {
+  // The exact shape handoff.py `_blocks` writes.
+  const h = await start(board());
+  const frag = rich(h, "Lead **in**:\n\n- first $4\\times3$\n- second\n\nAfter.");
+  const ps = find(frag, (n) => n.tagName === "p");
+  const uls = find(frag, (n) => n.tagName === "ul");
+  const lis = find(frag, (n) => n.tagName === "li");
+  assert.equal(ps.length, 2);
+  assert.equal(uls.length, 1);
+  assert.deepEqual(lis.map((n) => n.textContent), ["first 4×3", "second"]);
+  assert.equal(ps[0].textContent, "Lead in:");
+  assert.equal(ps[1].textContent, "After.");
+  assert.equal(find(ps[0], (n) => n.tagName === "strong").length, 1);
+});
+
+test("a blank line splits one bullet list into two", async () => {
+  const h = await start(board());
+  const frag = rich(h, "- a\n- b\n\n- c");
+  assert.equal(find(frag, (n) => n.tagName === "ul").length, 2);
+});
+
+test("an unmatched $ cannot leak across a paragraph boundary", async () => {
+  const h = await start(board());
+  const frag = rich(h, "costs $5\n\nthen $x$ here");
+  const ps = find(frag, (n) => n.tagName === "p");
+  assert.equal(ps[0].textContent, "costs $5");
+  assert.equal(ps[1].textContent, "then x here");
+});

@@ -56,6 +56,47 @@ _FLAG_ENTRY = re.compile(r"^(?P<key>\d+)\.\s+(?P<body>.*?)(?=^\d+\.\s|\Z)", re.M
 _PRIORITY = re.compile(r"\b(?:high|top)\s+priority\b", re.I)
 
 
+_BULLET = re.compile(r"^[-*]\s+(?=\S)")
+
+
+def _blocks(text):
+    """Collapse hard-wrapped prose while keeping its block structure.
+
+    Markdown's own rules, cut down to what the ledger uses: a blank line ends
+    a paragraph, a line opening with `- ` (or `* `) starts a bullet, and any
+    other line — indented or not — continues whatever block it follows. Inside
+    a block all whitespace collapses to single spaces, exactly as before, so
+    one-paragraph prose comes out byte-identical to the old flattening.
+
+    The result joins paragraphs with a blank line and puts consecutive bullets
+    on consecutive `- ` lines, which is the form `renderRich` in app.js reads.
+    `*` must be followed by whitespace to count, so `**bold**` never does.
+    """
+    blocks = []  # [kind, [line fragments]] with kind "p" or "li"
+    open_block = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            open_block = False
+            continue
+        bullet = _BULLET.match(line)
+        if bullet:
+            blocks.append(["li", [line[bullet.end():]]])
+        elif open_block:
+            blocks[-1][1].append(line)
+        else:
+            blocks.append(["p", [line]])
+        open_block = True
+    out = []
+    for index, (kind, parts) in enumerate(blocks):
+        body = " ".join(" ".join(parts).split())
+        if index:
+            # Consecutive bullets share a list; anything else is a new block.
+            out.append("\n" if kind == "li" and blocks[index - 1][0] == "li" else "\n\n")
+        out.append(f"- {body}" if kind == "li" else body)
+    return "".join(out)
+
+
 def _section_7(text):
     start = _SECTION_7.search(text)
     if start is None:
@@ -123,7 +164,7 @@ def _parse_items(body):
             items.append(Item(
                 id=match.group("num"),
                 title=match.group("title").strip(),
-                why=" ".join(why.split()),
+                why=_blocks(why),
                 owner=owner,
                 state=state,
                 raised=raised.group("date") if raised else "",
@@ -174,7 +215,7 @@ def _parse_flags(body):
     text = body[match.end():]
     flags = []
     for entry in _FLAG_ENTRY.finditer(text):
-        raw = " ".join(entry.group("body").split())
+        raw = _blocks(entry.group("body"))
         flags.append(Flag(key=flag_key(raw), text=raw, resolved=raw.startswith("~~"),
                           ordinal=entry.group("key")))
     return flags

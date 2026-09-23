@@ -1,6 +1,6 @@
 import pytest
 
-from project_tracker.sources.handoff import HandoffParseError, parse_handoff
+from project_tracker.sources.handoff import HandoffParseError, flag_key, parse_handoff
 
 SAMPLE = """\
 ## 6. Do NOT re-add these
@@ -311,3 +311,55 @@ the earlier estimate. *Task `86akhc9zz`.*
 """
     items, _ = parse_handoff(ok)
     assert [i.id for i in items] == ["1", "2"]
+
+
+BLOCKS = """\
+## 7. Open items
+
+### Open — Jonathon
+
+**5. Level crossings** — first paragraph, hard-wrapped
+across two lines.
+
+Second paragraph, with a list:
+- one bullet
+  that wraps
+- **bold** second bullet
+* star bullet
+
+*Task `86akhca02`.* trailing paragraph.
+**6. Single paragraph** — wrapped
+   and indented, **bold** kept.
+
+### 7.1 Flags
+
+1. **A flag with bullets.** Lead-in:
+   - first
+   - second
+"""
+
+
+def test_blank_lines_and_bullets_survive_as_block_structure():
+    items, _ = parse_handoff(BLOCKS)
+    by_id = {i.id: i for i in items}
+    assert by_id["5"].why == (
+        "first paragraph, hard-wrapped across two lines.\n\n"
+        "Second paragraph, with a list:\n\n"
+        "- one bullet that wraps\n"
+        "- **bold** second bullet\n"
+        "- star bullet\n\n"
+        "*Task `86akhca02`.* trailing paragraph.")
+    assert by_id["5"].clickup_id == "86akhca02"
+
+
+def test_single_paragraph_prose_is_flattened_exactly_as_before():
+    items, _ = parse_handoff(BLOCKS)
+    by_id = {i.id: i for i in items}
+    assert by_id["6"].why == "wrapped and indented, **bold** kept."
+
+
+def test_flag_bodies_keep_their_bullets_and_their_key():
+    _, flags = parse_handoff(BLOCKS)
+    assert flags[0].text == "**A flag with bullets.** Lead-in:\n\n- first\n- second"
+    # The key hashes the bold headline only, so block structure cannot move it.
+    assert flags[0].key == flag_key("**A flag with bullets.** Lead-in: - first - second")

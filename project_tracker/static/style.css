@@ -74,6 +74,11 @@ code {
   font-size: .92em; color: var(--ink);
 }
 .why code, .grounds code { color: var(--muted); }
+/* §7 block structure: paragraphs and bullet lists inside a why or a flag. */
+.why p, .grounds p, .card .title p { margin: 6px 0 0; }
+.why p:first-child, .grounds p:first-child, .card .title p:first-child { margin-top: 0; }
+.why ul, .grounds ul, .card .title ul { margin: 4px 0 0; padding-left: 20px; }
+.why li, .grounds li, .card .title li { margin-top: 2px; }
 /* The raised date is pushed to the far end of its meta row. */
 .meta .raised { margin-left: auto; }
 .difficulty {

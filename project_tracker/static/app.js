@@ -288,8 +288,32 @@ function scanRich(str) {
  * nested/odd markup degrades to plain text rather than throwing. */
 function renderRich(text) {
   const frag = document.createDocumentFragment();
-  for (const n of scanRich(text === null || text === undefined ? "" : String(text))) {
-    frag.appendChild(n);
+  const str = text === null || text === undefined ? "" : String(text);
+  if (!str.includes("\n")) {
+    // One block: inline nodes straight into the fragment, no wrapper, which
+    // is what every title and every single-paragraph why still gets.
+    for (const n of scanRich(str)) frag.appendChild(n);
+    return frag;
+  }
+  // Block structure as the sync parser writes it (handoff.py `_blocks`): a
+  // blank line between paragraphs, one `- ` line per bullet. Each paragraph
+  // becomes a <p>, each run of bullets one <ul>. Inline markup is scanned per
+  // block, so a stray `$` or `**` cannot leak across a paragraph boundary.
+  let list = null;
+  for (const line of str.split("\n")) {
+    if (!line.trim()) { list = null; continue; }
+    const bullet = /^[-*]\s+(?=\S)/.exec(line);
+    if (bullet) {
+      if (!list) { list = document.createElement("ul"); frag.appendChild(list); }
+      const li = document.createElement("li");
+      for (const n of scanRich(line.slice(bullet[0].length))) li.appendChild(n);
+      list.appendChild(li);
+    } else {
+      list = null;
+      const p = document.createElement("p");
+      for (const n of scanRich(line)) p.appendChild(n);
+      frag.appendChild(p);
+    }
   }
   return frag;
 }
@@ -501,7 +525,8 @@ function flagCard(flag) {
   return el("div", { class: resolved ? "card flag resolved" : "card flag" }, [
     el("div", { class: "row" }, [
       flag.ordinal ? el("span", { class: "num", text: `§7.1.${flag.ordinal}` }) : null,
-      richEl("span", { class: "title" }, flag.text),
+      // A div, not a span: a flag may now carry paragraphs and bullets.
+      richEl("div", { class: "title" }, flag.text),
     ]),
     el("div", { class: "meta" }, [
       el("span", { text: `first seen ${flag.first_seen || "unknown"}` }),
