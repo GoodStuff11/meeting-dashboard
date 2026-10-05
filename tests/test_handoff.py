@@ -239,8 +239,8 @@ def _configured_handoff():
 
 
 REAL = _configured_handoff()
-EXPECTED_ITEMS = 38
-EXPECTED_FLAGS = 7
+EXPECTED_ITEMS = 42
+EXPECTED_FLAGS = 9
 
 
 @pytest.mark.skipif(REAL is None, reason="no HANDOFF.md configured")
